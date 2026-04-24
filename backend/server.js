@@ -12,7 +12,7 @@ app.use(express.json());
 app.use('/api/scan', scanRoutes);
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', service: 'Antigravity API' });
+    res.json({ status: 'ok', service: 'Aegis CyberAudit API' });
 });
 
 app.listen(PORT, () => {

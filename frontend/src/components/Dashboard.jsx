@@ -50,6 +50,20 @@ export default function Dashboard({ session }) {
   const handleScan = async (e) => {
     e.preventDefault();
     if (!targetUrl) return;
+    
+    // Validación Anti-SSRF (prevenir localhost o IPs internas)
+    try {
+      const urlObj = new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`);
+      const hostname = urlObj.hostname;
+      
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.')) {
+        throw new Error('No se permiten auditorías a redes internas o localhost (Seguridad SSRF).');
+      }
+    } catch (err) {
+      setError(err.message || 'URL inválida');
+      return;
+    }
+
     setError('');
     setIsScanning(true);
 
@@ -102,7 +116,7 @@ export default function Dashboard({ session }) {
       <header className="flex justify-between items-center mb-12 glass-card p-4">
         <div className="flex items-center gap-3">
           <Target className="w-8 h-8 text-primary-500" />
-          <h1 className="text-xl font-bold text-white tracking-wide">Antigravity Console</h1>
+          <h1 className="text-xl font-bold text-white tracking-wide">Aegis Console</h1>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-400">{session.user.email}</span>

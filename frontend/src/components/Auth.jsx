@@ -43,8 +43,8 @@ export default function Auth() {
           <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 mb-4 shadow-[0_0_15px_rgba(0,255,136,0.2)]">
             <Shield className="w-8 h-8 text-primary-500" />
           </div>
-          <h1 className="text-3xl font-bold text-gradient mb-2">Antigravity</h1>
-          <p className="text-gray-400 text-sm text-center">Auditoría B2B Automatizada</p>
+          <h1 className="text-3xl font-bold text-gradient mb-2">Aegis CyberAudit</h1>
+          <p className="text-gray-400 text-sm text-center">Auditoría y Compliance B2B</p>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">

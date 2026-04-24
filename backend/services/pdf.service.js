@@ -41,17 +41,20 @@ async function generateAndUploadPdf(scanId, targetUrl, vulnerabilities) {
             }
         });
 
-        // Contenido del PDF
-        doc.fontSize(24).text('Antigravity', { align: 'center' });
-        doc.fontSize(16).text('Reporte de Auditoría de Ciberseguridad', { align: 'center' });
+        // Contenido del PDF (Diseño Corporativo Aegis)
+        doc.rect(0, 0, doc.page.width, 100).fill('#0f172a');
+        doc.fontSize(28).fillColor('#00ff88').text('Aegis CyberAudit', 50, 40, { align: 'left' });
+        doc.fontSize(12).fillColor('#94a3b8').text('Enterprise Security Report', 50, 75, { align: 'left' });
+        
+        doc.moveDown(4);
+        doc.fontSize(16).fillColor('#0f172a').text('Resumen Ejecutivo', { underline: true });
+        doc.moveDown(0.5);
+        doc.fontSize(12).fillColor('#334155').text(`Objetivo Auditado: ${targetUrl}`);
+        doc.text(`Fecha del Escaneo: ${new Date().toLocaleDateString()}`);
+        doc.text(`ID de Auditoría: ${scanId}`);
         doc.moveDown(2);
         
-        doc.fontSize(12).text(`Objetivo: ${targetUrl}`);
-        doc.text(`Fecha: ${new Date().toLocaleDateString()}`);
-        doc.text(`ID de Escaneo: ${scanId}`);
-        doc.moveDown(2);
-        
-        doc.fontSize(16).text('Hallazgos y Mapeo ISO 27001', { underline: true });
+        doc.fontSize(16).fillColor('#0f172a').text('Hallazgos y Mapeo Normativo (ISO 27001)', { underline: true });
         doc.moveDown();
 
         if (vulnerabilities.length === 0) {
