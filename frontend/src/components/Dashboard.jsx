@@ -81,7 +81,8 @@ export default function Dashboard({ session }) {
       if (targetError) throw targetError;
 
       // 2. Llamar a nuestro backend API para iniciar orquestación
-      const res = await fetch('http://localhost:3000/api/scan', {
+      const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const res = await fetch(`${backendUrl}/api/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
