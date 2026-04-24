@@ -27,6 +27,9 @@ export default function Dashboard({ session }) {
           fetchScans(); // Refrescar cuando cambie el estado
           if (payload.new && payload.new.status === 'completed') {
             setIsScanning(false);
+          } else if (payload.new && payload.new.status === 'failed') {
+            setIsScanning(false);
+            setError('El escaneo ha fallado en el servidor. Verifica los logs del backend o la configuración.');
           }
         }
       )
@@ -90,9 +93,14 @@ export default function Dashboard({ session }) {
       if (!res.ok) throw new Error('Falló el inicio del escaneo en el backend');
       
       setTargetUrl('');
+      fetchScans(); // Actualiza la lista para mostrar el nuevo escaneo en progreso
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      if (err.message.includes('Failed to fetch')) {
+        setError('Error de conexión: El backend no está corriendo o no responde. Por favor, asegúrate de iniciar el servidor en el puerto 3000.');
+      } else {
+        setError(err.message);
+      }
       setIsScanning(false);
     }
   };
