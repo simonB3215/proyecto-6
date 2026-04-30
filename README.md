@@ -38,28 +38,6 @@ El proyecto está construido con un stack moderno enfocado en la velocidad, segu
 
 ---
 
-## 🚀 Cómo ejecutar el proyecto localmente
-
-### 1. Configurar el Backend
-```bash
-cd backend
-npm install
-# Renombrar .env.example a .env y colocar las variables de Supabase
-npm run dev
-```
-El backend correrá por defecto en `http://localhost:3000`.
-
-### 2. Configurar el Frontend
-```bash
-cd frontend
-npm install
-# Renombrar .env.local.example a .env.local y colocar las variables de Supabase
-npm run dev
-```
-El frontend se levantará por defecto en `http://localhost:5173`.
-
----
-
 ## 🔒 Consideraciones de Seguridad Implementadas
 - **Tenant Isolation:** Filtros en Frontend y políticas estrictas RLS en PostgreSQL aseguran que un usuario (`user_id`) solo puede leer y crear escaneos que le pertenezcan.
 - **Descargas Firmadas:** Los reportes de auditoría están en un Bucket Privado. El backend verifica la identidad del usuario antes de otorgar una URL temporal para descargar el PDF.
