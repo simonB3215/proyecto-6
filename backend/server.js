@@ -4,6 +4,8 @@ const cors = require('cors');
 const scanRoutes = require('./routes/scan.routes');
 
 const app = express();
+require('./workers/scanQueue'); // Iniciar el worker de la cola de escaneo
+
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());

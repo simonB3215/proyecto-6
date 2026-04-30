@@ -39,6 +39,18 @@ const startScan = async (req, res) => {
             return res.status(404).json({ error: 'Target not found or access denied' });
         }
 
+        // 1.5 Validar Propiedad del Dominio (Anti-Abuso)
+        const dnsService = require('../services/dns.service');
+        const expectedToken = `aegis-verify=${user.id}`;
+        const isVerified = await dnsService.verifyDomainOwnership(targetData.url, expectedToken);
+
+        if (!isVerified) {
+            return res.status(403).json({ 
+                error: 'Domain not verified',
+                message: `Please add a TXT record to your domain with the value: ${expectedToken}` 
+            });
+        }
+
         // 2. Crear Registro de Scan (in_progress)
         const { data: scanData, error: scanError } = await supabase
             .from('scans')
@@ -60,53 +72,12 @@ const startScan = async (req, res) => {
             scan_id: scanData.id 
         });
 
-        // 3. Ejecutar el Escaneo (En background)
-        // En un entorno de producción, esto iría a una cola (RabbitMQ/BullMQ)
-        (async () => {
-            try {
-                const rawVulnerabilities = await scannerService.performScan(targetData.url);
-                
-                const vulnerabilitiesToInsert = rawVulnerabilities.map(v => ({
-                    scan_id: scanData.id,
-                    title: v.title,
-                    description: v.description,
-                    severity: v.severity,
-                    iso_27001_control: mapToControl(v.type)
-                }));
-
-                // Insertar vulnerabilidades si existen
-                if (vulnerabilitiesToInsert.length > 0) {
-                    const { error: vulnError } = await supabase
-                        .from('vulnerabilities')
-                        .insert(vulnerabilitiesToInsert);
-                    if (vulnError) console.error("Error inserting vulns:", vulnError);
-                }
-
-                // 4. Generar PDF
-                const pdfUrl = await pdfService.generateAndUploadPdf(
-                    scanData.id, 
-                    targetData.url, 
-                    vulnerabilitiesToInsert
-                );
-
-                // 5. Actualizar registro del scan a completed
-                await supabase
-                    .from('scans')
-                    .update({ 
-                        status: 'completed', 
-                        completed_at: new Date().toISOString(),
-                        pdf_url: pdfUrl
-                    })
-                    .eq('id', scanData.id);
-
-            } catch (err) {
-                console.error('Proceso de escaneo falló:', err);
-                await supabase
-                    .from('scans')
-                    .update({ status: 'failed' })
-                    .eq('id', scanData.id);
-            }
-        })(); // Self-invoking async function to run in background
+        // 3. Ejecutar el Escaneo (Encolar en BullMQ)
+        const { scanQueue } = require('../workers/scanQueue');
+        await scanQueue.add('process-scan', {
+            scanData: scanData,
+            targetData: targetData
+        });
 
     } catch (error) {
         console.error('Error starting scan:', error);

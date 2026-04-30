@@ -1,13 +1,40 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { LogOut, Target, Play, FileText, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { LogOut, Target, Play, FileText, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, ShieldOff, Info } from 'lucide-react';
 import ScanLoader from './ScanLoader';
+import ComplianceScore from './ComplianceScore';
 
 export default function Dashboard({ session }) {
   const [targetUrl, setTargetUrl] = useState('');
   const [scans, setScans] = useState([]);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState('');
+  const [expandedScanId, setExpandedScanId] = useState(null);
+
+  const calculateScore = (vulnerabilities) => {
+    if (!vulnerabilities) return 100;
+    let score = 100;
+    vulnerabilities.filter(v => !v.is_false_positive).forEach(v => {
+      if (v.severity === 'critical') score -= 20;
+      if (v.severity === 'high') score -= 10;
+      if (v.severity === 'medium') score -= 5;
+    });
+    return Math.max(0, score);
+  };
+
+  const toggleFalsePositive = async (vuln) => {
+    const { error } = await supabase
+      .from('vulnerabilities')
+      .update({ is_false_positive: !vuln.is_false_positive })
+      .eq('id', vuln.id);
+      
+    if (!error) {
+      fetchScans(); // Refrescar para ver el cambio reflejado
+    } else {
+      console.error("Error al marcar como falso positivo:", error);
+      setError("No se pudo actualizar el estado de la vulnerabilidad.");
+    }
+  };
 
   useEffect(() => {
     fetchScans();
@@ -43,7 +70,7 @@ export default function Dashboard({ session }) {
   const fetchScans = async () => {
     const { data, error } = await supabase
       .from('scans')
-      .select('*, targets(url)')
+      .select('*, targets(url), vulnerabilities(*)')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     
@@ -155,6 +182,17 @@ export default function Dashboard({ session }) {
               <ScanLoader />
             ) : (
               <form onSubmit={handleScan} className="space-y-4">
+                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-blue-200">
+                    <p className="font-semibold mb-1">Verificación de Dominio Requerida</p>
+                    <p>Por seguridad, debes añadir un registro TXT en la configuración DNS de tu dominio antes de auditarlo:</p>
+                    <code className="block mt-2 bg-dark-900/50 p-2 rounded text-blue-300 font-mono text-xs select-all">
+                      aegis-verify={session.user.id}
+                    </code>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">URL del Objetivo</label>
                   <input
@@ -193,54 +231,115 @@ export default function Dashboard({ session }) {
               </div>
             ) : (
               scans.map((scan) => (
-                <div key={scan.id} className="bg-dark-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
-                  <div className="flex items-center gap-4">
-                    {getStatusIcon(scan.status)}
-                    <div>
-                      <p className="text-white font-medium">{scan.targets?.url}</p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(scan.created_at).toLocaleString()}
-                      </p>
+                <div key={scan.id} className="bg-dark-900/40 border border-white/5 rounded-xl flex flex-col hover:bg-white/5 transition-colors overflow-hidden">
+                  <div className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      {getStatusIcon(scan.status)}
+                      <div>
+                        <p className="text-white font-medium">{scan.targets?.url}</p>
+                        <p className="text-xs text-gray-400">
+                          {new Date(scan.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs px-2 py-1 rounded-full border ${
+                        scan.status === 'completed' ? 'border-primary-500/30 text-primary-400 bg-primary-500/10' :
+                        scan.status === 'in_progress' ? 'border-accent-500/30 text-accent-400 bg-accent-500/10' :
+                        'border-red-500/30 text-red-400 bg-red-500/10'
+                      }`}>
+                        {scan.status.toUpperCase()}
+                      </span>
+                      
+                      {scan.status === 'completed' && scan.pdf_url && (
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                              const { data: { session: currentSession } } = await supabase.auth.getSession();
+                              const res = await fetch(`${backendUrl}/api/scan/${scan.id}/pdf`, {
+                                headers: { 'Authorization': `Bearer ${currentSession?.access_token}` }
+                              });
+                              if (!res.ok) throw new Error('Error solicitando PDF');
+                              
+                              const data = await res.json();
+                              if (data.url) {
+                                window.open(data.url, '_blank');
+                              } else {
+                                throw new Error('URL no recibida');
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              setError('No se pudo abrir el PDF.');
+                            }
+                          }}
+                          className="bg-white/10 hover:bg-primary-500/20 hover:text-primary-400 text-white p-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                        >
+                          Ver PDF
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={() => setExpandedScanId(expandedScanId === scan.id ? null : scan.id)}
+                        className="p-2 text-gray-400 hover:text-white transition-colors"
+                      >
+                        {expandedScanId === scan.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs px-2 py-1 rounded-full border ${
-                      scan.status === 'completed' ? 'border-primary-500/30 text-primary-400 bg-primary-500/10' :
-                      scan.status === 'in_progress' ? 'border-accent-500/30 text-accent-400 bg-accent-500/10' :
-                      'border-red-500/30 text-red-400 bg-red-500/10'
-                    }`}>
-                      {scan.status.toUpperCase()}
-                    </span>
-                    
-                    {scan.status === 'completed' && scan.pdf_url && (
-                      <button 
-                        onClick={async () => {
-                          try {
-                            const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-                            const { data: { session: currentSession } } = await supabase.auth.getSession();
-                            const res = await fetch(`${backendUrl}/api/scan/${scan.id}/pdf`, {
-                              headers: { 'Authorization': `Bearer ${currentSession?.access_token}` }
-                            });
-                            if (!res.ok) throw new Error('Error solicitando PDF');
-                            
-                            const data = await res.json();
-                            if (data.url) {
-                              window.open(data.url, '_blank');
-                            } else {
-                              throw new Error('URL no recibida');
-                            }
-                          } catch (err) {
-                            console.error(err);
-                            setError('No se pudo abrir el PDF.');
-                          }
-                        }}
-                        className="bg-white/10 hover:bg-primary-500/20 hover:text-primary-400 text-white p-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
-                      >
-                        Ver PDF
-                      </button>
-                    )}
-                  </div>
+
+                  {expandedScanId === scan.id && scan.status === 'completed' && (
+                    <div className="px-4 pb-4 border-t border-white/10 bg-dark-900/60 pt-4 mt-2">
+                      <div className="mb-6">
+                        <ComplianceScore score={calculateScore(scan.vulnerabilities)} />
+                      </div>
+                      
+                      <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
+                        <ShieldOff className="w-4 h-4 text-accent-500" />
+                        Hallazgos Detallados
+                      </h4>
+                      
+                      {(!scan.vulnerabilities || scan.vulnerabilities.length === 0) ? (
+                        <p className="text-sm text-green-400">No se detectaron vulnerabilidades.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {scan.vulnerabilities.map(vuln => (
+                            <div key={vuln.id} className={`p-3 rounded border text-sm flex justify-between items-start ${vuln.is_false_positive ? 'bg-gray-800/50 border-gray-700 opacity-50' : 'bg-dark-800 border-white/5'}`}>
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                                    vuln.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                    vuln.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                    vuln.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                                    'bg-green-500/20 text-green-400'
+                                  }`}>
+                                    {vuln.severity.toUpperCase()}
+                                  </span>
+                                  <span className={`font-semibold ${vuln.is_false_positive ? 'line-through text-gray-500' : 'text-gray-200'}`}>
+                                    {vuln.title}
+                                  </span>
+                                </div>
+                                {!vuln.is_false_positive && (
+                                  <p className="text-gray-400 mt-1 line-clamp-2">{vuln.description}</p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => toggleFalsePositive(vuln)}
+                                className={`text-xs px-2 py-1 rounded transition-colors whitespace-nowrap ml-4 ${
+                                  vuln.is_false_positive 
+                                  ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                                  : 'bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-gray-400'
+                                }`}
+                              >
+                                {vuln.is_false_positive ? 'Restaurar' : 'Marcar Falso Positivo'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}

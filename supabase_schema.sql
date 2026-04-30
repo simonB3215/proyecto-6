@@ -22,16 +22,25 @@ CREATE TABLE public.scans (
     completed_at TIMESTAMP WITH TIME ZONE
 );
 
--- 3. Tabla: vulnerabilities (Hallazgos y mapeo ISO 27001)
+-- 3. Tabla: iso_controls (Catálogo de controles de ISO 27001)
+CREATE TABLE public.iso_controls (
+    id VARCHAR(50) PRIMARY KEY, -- ej. 'A.10'
+    name VARCHAR(255) NOT NULL,
+    description TEXT
+);
+
+-- 4. Tabla: vulnerabilities (Hallazgos y mapeo ISO 27001)
 CREATE TYPE vulnerability_severity AS ENUM ('low', 'medium', 'high', 'critical');
 
 CREATE TABLE public.vulnerabilities (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    scan_id UUID NOT NULL REFERENCES public.scans(id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
+    scan_id UUID REFERENCES scans(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
     description TEXT,
-    severity vulnerability_severity NOT NULL,
-    iso_27001_control TEXT, -- Ejemplo: 'A.12.6.1'
+    severity VARCHAR(50),
+    type VARCHAR(100),
+    is_false_positive BOOLEAN DEFAULT false,
+    iso_27001_control VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -68,6 +77,16 @@ WITH CHECK (auth.uid() = user_id);
 -- Políticas para vulnerabilities
 CREATE POLICY "Users can view vulnerabilities of their scans" 
 ON public.vulnerabilities FOR SELECT 
+USING (
+    EXISTS (
+        SELECT 1 FROM public.scans 
+        WHERE scans.id = vulnerabilities.scan_id 
+        AND scans.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can update vulnerabilities of their scans" 
+ON public.vulnerabilities FOR UPDATE 
 USING (
     EXISTS (
         SELECT 1 FROM public.scans 

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte Ejecutivo de Auditoría</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .page-break { page-break-after: always; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; }
+    </style>
+</head>
+<body class="p-10">
+    <div class="glass-panel p-8 mb-10">
+        <h1 class="text-4xl font-bold text-white mb-2">Aegis CyberAudit</h1>
+        <h2 class="text-2xl text-blue-400">Reporte Ejecutivo (QPR)</h2>
+        <p class="text-gray-400 mt-4">Objetivo: <span class="text-white">{{TARGET_URL}}</span></p>
+        <p class="text-gray-400">Fecha: <span class="text-white">{{DATE}}</span></p>
+    </div>
+
+    <div class="mb-10">
+        <h3 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">Resumen Ejecutivo</h3>
+        <p class="text-gray-300">Se identificaron un total de <span class="font-bold text-white">{{VULN_COUNT}}</span> vulnerabilidades en el objetivo analizado.</p>
+        
+        <!-- Score de Ley Chile 21.663 -->
+        <div class="mt-6 p-4 rounded bg-gray-800 border-l-4 {{SCORE_COLOR}}">
+            <h4 class="font-bold text-white">Score de Preparación Legal (Ley Marco Ciberseguridad 21.663)</h4>
+            <p class="text-gray-300 mt-2">Cumplimiento estimado: <span class="font-bold text-white">{{LEGAL_SCORE}}%</span></p>
+            <p class="text-sm text-gray-400 mt-1">Disclaimer: Este score es orientativo basado en buenas prácticas preventivas.</p>
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h3 class="text-xl font-semibold mb-6 border-b border-gray-700 pb-2">Detalle de Vulnerabilidades (Formato QPR)</h3>
+
+    {{VULNERABILITIES_HTML}}
+
+</body>
+</html>

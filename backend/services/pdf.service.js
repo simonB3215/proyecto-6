@@ -1,81 +1,112 @@
-const PDFDocument = require('pdfkit');
+const puppeteer = require('puppeteer');
 const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs').promises;
+const path = require('path');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-// Evitar errores si no hay variables de entorno (útil en dev sin env)
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+
+function calculateLegalScore(vulnerabilities) {
+    let score = 100;
+    vulnerabilities.forEach(v => {
+        if (v.severity === 'critical') score -= 20;
+        if (v.severity === 'high') score -= 10;
+        if (v.severity === 'medium') score -= 5;
+    });
+    if (score < 0) score = 0;
+
+    let scoreColor = 'border-green-500';
+    if (score < 50) scoreColor = 'border-red-500';
+    else if (score < 80) scoreColor = 'border-yellow-500';
+
+    return { score, scoreColor };
+}
 
 async function generateAndUploadPdf(scanId, targetUrl, vulnerabilities) {
     if (!supabase) throw new Error("Supabase credentials not configured in backend");
 
-    return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ margin: 50 });
-        const buffers = [];
-        
-        doc.on('data', buffers.push.bind(buffers));
-        doc.on('end', async () => {
-            const pdfData = Buffer.concat(buffers);
-            const fileName = `${scanId}.pdf`;
-            
-            try {
-                // Upload a Supabase Storage
-                const { data, error } = await supabase.storage
-                    .from('reports')
-                    .upload(fileName, pdfData, {
-                        contentType: 'application/pdf',
-                        upsert: true
-                    });
-                
-                if (error) throw error;
-                
-                // Obtener URL pública
-                const { data: publicUrlData } = supabase.storage
-                    .from('reports')
-                    .getPublicUrl(fileName);
-                
-                resolve(publicUrlData.publicUrl);
-            } catch (err) {
-                console.error("Error subiendo el PDF:", err);
-                reject(err);
-            }
-        });
+    try {
+        // 1. Leer plantilla HTML
+        const templatePath = path.join(__dirname, '../templates/report_qpr.html');
+        let htmlContent = await fs.readFile(templatePath, 'utf8');
 
-        // Contenido del PDF (Diseño Corporativo Aegis)
-        doc.rect(0, 0, doc.page.width, 100).fill('#0f172a');
-        doc.fontSize(28).fillColor('#00ff88').text('Aegis CyberAudit', 50, 40, { align: 'left' });
-        doc.fontSize(12).fillColor('#94a3b8').text('Enterprise Security Report', 50, 75, { align: 'left' });
+        // 2. Procesar datos
+        const { score, scoreColor } = calculateLegalScore(vulnerabilities);
+        const dateStr = new Date().toLocaleDateString();
         
-        doc.moveDown(4);
-        doc.fontSize(16).fillColor('#0f172a').text('Resumen Ejecutivo', { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(12).fillColor('#334155').text(`Objetivo Auditado: ${targetUrl}`);
-        doc.text(`Fecha del Escaneo: ${new Date().toLocaleDateString()}`);
-        doc.text(`ID de Auditoría: ${scanId}`);
-        doc.moveDown(2);
-        
-        doc.fontSize(16).fillColor('#0f172a').text('Hallazgos y Mapeo Normativo (ISO 27001)', { underline: true });
-        doc.moveDown();
+        let vulnsHtml = vulnerabilities.map(v => `
+        <div class="mb-6 p-6 bg-gray-800 rounded-lg border border-gray-700 break-inside-avoid">
+            <h4 class="text-lg font-bold text-red-400 mb-2">[${(v.severity || 'low').toUpperCase()}] ${v.title}</h4>
+            <div class="mb-3">
+                <span class="font-semibold text-blue-400">Impacto de Negocio (Question):</span>
+                <p class="text-gray-300 text-sm mt-1">¿Cómo afecta esto a la operación? Esta vulnerabilidad podría exponer información confidencial o interrumpir servicios, afectando la confianza del cliente y el cumplimiento normativo.</p>
+            </div>
+            <div class="mb-3">
+                <span class="font-semibold text-orange-400">Descripción Técnica (Problem):</span>
+                <p class="text-gray-300 text-sm mt-1">${v.description}</p>
+            </div>
+            <div class="mb-3">
+                <span class="font-semibold text-green-400">Guía de Corrección (Resolution):</span>
+                <p class="text-gray-300 text-sm mt-1">Se recomienda remediar el hallazgo siguiendo las mejores prácticas para el control normativo: <strong>ISO 27001 - ${v.iso_27001_control || 'N/A'}</strong>.</p>
+            </div>
+        </div>
+        `).join('');
 
         if (vulnerabilities.length === 0) {
-            doc.fontSize(12).fillColor('green').text('No se encontraron vulnerabilidades en esta revisión básica.');
-        } else {
-            vulnerabilities.forEach((vuln, index) => {
-                let color = 'black';
-                if (vuln.severity === 'critical') color = 'darkred';
-                else if (vuln.severity === 'high') color = 'red';
-                else if (vuln.severity === 'medium') color = 'orange';
-
-                doc.fontSize(14).fillColor(color).text(`${index + 1}. ${vuln.title} [${vuln.severity.toUpperCase()}]`);
-                doc.fontSize(12).fillColor('black').text(`Descripción: ${vuln.description}`);
-                doc.text(`Control ISO 27001: ${vuln.iso_27001_control}`);
-                doc.moveDown();
-            });
+            vulnsHtml = '<p class="text-green-400 font-bold">Excelente. No se detectaron vulnerabilidades en el análisis.</p>';
         }
+
+        // 3. Reemplazar variables en HTML
+        htmlContent = htmlContent
+            .replace('{{TARGET_URL}}', targetUrl)
+            .replace('{{DATE}}', dateStr)
+            .replace('{{VULN_COUNT}}', vulnerabilities.length)
+            .replace('{{SCORE_COLOR}}', scoreColor)
+            .replace('{{LEGAL_SCORE}}', score)
+            .replace('{{VULNERABILITIES_HTML}}', vulnsHtml);
+
+        // 4. Renderizar PDF con Puppeteer
+        const browser = await puppeteer.launch({ 
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox'] // Importante para entornos Docker/Server
+        });
+        const page = await browser.newPage();
         
-        // Finalizar y desencadenar el evento 'end'
-        doc.end();
-    });
+        // Cargar el HTML (esperar a que networkidle0 para que Tailwind CDN se cargue si hay internet, 
+        // aunque es mejor cargar los estilos localmente, dejaremos CDN por MVP)
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' }
+        });
+
+        await browser.close();
+
+        // 5. Subir a Supabase
+        const fileName = `${scanId}.pdf`;
+        const { data, error } = await supabase.storage
+            .from('reports')
+            .upload(fileName, pdfBuffer, {
+                contentType: 'application/pdf',
+                upsert: true
+            });
+        
+        if (error) throw error;
+        
+        // Obtener URL pública (o generar url firmada en el endpoint que la pide)
+        const { data: publicUrlData } = supabase.storage
+            .from('reports')
+            .getPublicUrl(fileName);
+        
+        return publicUrlData.publicUrl;
+
+    } catch (err) {
+        console.error("Error generando/subiendo el PDF con Puppeteer:", err);
+        throw err;
+    }
 }
 
 module.exports = { generateAndUploadPdf };

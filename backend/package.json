@@ -13,9 +13,11 @@
   "type": "commonjs",
   "dependencies": {
     "@supabase/supabase-js": "^2.104.1",
+    "bullmq": "^5.76.4",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "pdfkit": "^0.18.0"
+    "ioredis": "^5.10.1",
+    "puppeteer": "^24.42.0"
   }
 }
