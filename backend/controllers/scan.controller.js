@@ -11,20 +11,32 @@ const startScan = async (req, res) => {
     try {
         if (!supabase) return res.status(500).json({ error: 'Database not configured' });
 
+        const authHeader = req.headers.authorization;
+        if (!authHeader) return res.status(401).json({ error: 'Unauthorized: Missing token' });
+        const token = authHeader.split(' ')[1];
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+
         const { target_id, user_id } = req.body;
         if (!target_id || !user_id) {
             return res.status(400).json({ error: 'target_id and user_id are required' });
         }
 
-        // 1. Obtener Info del Target
+        if (user.id !== user_id) {
+            return res.status(403).json({ error: 'Forbidden: You can only start scans for yourself' });
+        }
+
+        // 1. Obtener Info del Target (Validando que le pertenece al usuario)
         const { data: targetData, error: targetError } = await supabase
             .from('targets')
             .select('*')
             .eq('id', target_id)
+            .eq('user_id', user.id)
             .single();
 
         if (targetError || !targetData) {
-            return res.status(404).json({ error: 'Target not found' });
+            return res.status(404).json({ error: 'Target not found or access denied' });
         }
 
         // 2. Crear Registro de Scan (in_progress)
@@ -32,7 +44,7 @@ const startScan = async (req, res) => {
             .from('scans')
             .insert({
                 target_id,
-                user_id,
+                user_id: user.id,
                 status: 'in_progress'
             })
             .select()
@@ -106,6 +118,13 @@ const getScan = async (req, res) => {
     try {
         if (!supabase) return res.status(500).json({ error: 'Database not configured' });
 
+        const authHeader = req.headers.authorization;
+        if (!authHeader) return res.status(401).json({ error: 'Unauthorized: Missing token' });
+        const token = authHeader.split(' ')[1];
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+
         const { id } = req.params;
         const { data, error } = await supabase
             .from('scans')
@@ -115,9 +134,10 @@ const getScan = async (req, res) => {
                 vulnerabilities(*)
             `)
             .eq('id', id)
+            .eq('user_id', user.id)
             .single();
             
-        if (error || !data) return res.status(404).json({ error: 'Scan not found' });
+        if (error || !data) return res.status(404).json({ error: 'Scan not found or access denied' });
         
         res.json(data);
     } catch (error) {
@@ -125,4 +145,54 @@ const getScan = async (req, res) => {
     }
 };
 
-module.exports = { startScan, getScan };
+const getScanPdf = async (req, res) => {
+    try {
+        if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+
+        // Permitimos el token por header Authorization o por query parameter ?token=...
+        let token = null;
+        if (req.headers.authorization) {
+            token = req.headers.authorization.split(' ')[1];
+        } else if (req.query.token) {
+            token = req.query.token;
+        }
+
+        if (!token) return res.status(401).json({ error: 'Unauthorized: Missing token' });
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+
+        const { id } = req.params;
+        
+        // Verificar propiedad
+        const { data: scanData, error: scanError } = await supabase
+            .from('scans')
+            .select('id, pdf_url')
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .single();
+
+        if (scanError || !scanData || !scanData.pdf_url) {
+            return res.status(404).json({ error: 'PDF not found or access denied' });
+        }
+
+        // Generar URL firmada válida por 60 segundos usando Service Role Key
+        const fileName = `${id}.pdf`;
+        const { data: signedData, error: signError } = await supabase.storage
+            .from('reports')
+            .createSignedUrl(fileName, 60);
+
+        if (signError || !signedData) {
+            return res.status(500).json({ error: 'Failed to generate secure URL for PDF' });
+        }
+
+        // Redirigir al cliente a la URL segura
+        res.redirect(signedData.signedUrl);
+
+    } catch (error) {
+        console.error('Error fetching PDF:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+module.exports = { startScan, getScan, getScanPdf };

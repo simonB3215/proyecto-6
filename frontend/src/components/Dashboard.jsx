@@ -44,6 +44,7 @@ export default function Dashboard({ session }) {
     const { data, error } = await supabase
       .from('scans')
       .select('*, targets(url)')
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     
     if (data) setScans(data);
@@ -82,9 +83,14 @@ export default function Dashboard({ session }) {
 
       // 2. Llamar a nuestro backend API para iniciar orquestación
       const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
       const res = await fetch(`${backendUrl}/api/scan`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession?.access_token}`
+        },
         body: JSON.stringify({ 
           target_id: targetData.id, 
           user_id: session.user.id 
@@ -209,7 +215,7 @@ export default function Dashboard({ session }) {
                     
                     {scan.status === 'completed' && scan.pdf_url && (
                       <a 
-                        href={scan.pdf_url} 
+                        href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/scan/${scan.id}/pdf?token=${session.access_token}`}
                         target="_blank" 
                         rel="noreferrer"
                         className="bg-white/10 hover:bg-primary-500/20 hover:text-primary-400 text-white p-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
