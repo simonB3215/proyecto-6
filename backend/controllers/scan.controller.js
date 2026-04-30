@@ -186,8 +186,8 @@ const getScanPdf = async (req, res) => {
             return res.status(500).json({ error: 'Failed to generate secure URL for PDF' });
         }
 
-        // Redirigir al cliente a la URL segura
-        res.redirect(signedData.signedUrl);
+        // Devolver la URL segura en JSON para que el frontend la abra
+        res.json({ url: signedData.signedUrl });
 
     } catch (error) {
         console.error('Error fetching PDF:', error);

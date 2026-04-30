@@ -1,6 +1,6 @@
 # Resumen del Proyecto: Aegis CyberAudit (Plataforma SaaS de Auditoría)
 
-Este documento resume todo el trabajo realizado, la arquitectura establecida y las funcionalidades implementadas en la plataforma de ciberseguridad **Aegis CyberAudit**.
+Este documento resume todo el trabajo realizado, la arquitectura establecida y las funcionalidades implementadas en la plataforma de ciberseguridad **![alt text](image.png)**.
 
 ## 🎯 Objetivo del Proyecto
 Desarrollo de un MVP (Minimum Viable Product) de una plataforma SaaS B2B diseñada para automatizar auditorías de ciberseguridad, identificar vulnerabilidades en objetivos web y generar reportes ejecutivos mapeados con la normativa **ISO 27001**. 

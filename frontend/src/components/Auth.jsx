@@ -21,9 +21,13 @@ export default function Auth() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setMessage('Revisa tu correo para verificar tu cuenta.');
+        
+        // Si Supabase no inicia la sesión automáticamente, significa que pide confirmación
+        if (!data.session) {
+          setMessage('Revisa tu correo para verificar tu cuenta.');
+        }
       }
     } catch (err) {
       setError(err.message || 'Error de autenticación');

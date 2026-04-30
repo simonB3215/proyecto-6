@@ -222,11 +222,14 @@ export default function Dashboard({ session }) {
                             const res = await fetch(`${backendUrl}/api/scan/${scan.id}/pdf`, {
                               headers: { 'Authorization': `Bearer ${currentSession?.access_token}` }
                             });
-                            if (!res.ok) throw new Error('Error descargando PDF');
+                            if (!res.ok) throw new Error('Error solicitando PDF');
                             
-                            // El backend hace un redirect a la signed URL, así que res.url será esa URL
-                            // Podemos abrir esa URL directamente (que ya no tiene el JWT del usuario, sino el token efímero de Supabase)
-                            window.open(res.url, '_blank');
+                            const data = await res.json();
+                            if (data.url) {
+                              window.open(data.url, '_blank');
+                            } else {
+                              throw new Error('URL no recibida');
+                            }
                           } catch (err) {
                             console.error(err);
                             setError('No se pudo abrir el PDF.');
