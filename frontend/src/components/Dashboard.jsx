@@ -214,14 +214,28 @@ export default function Dashboard({ session }) {
                     </span>
                     
                     {scan.status === 'completed' && scan.pdf_url && (
-                      <a 
-                        href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/scan/${scan.id}/pdf?token=${session.access_token}`}
-                        target="_blank" 
-                        rel="noreferrer"
+                      <button 
+                        onClick={async () => {
+                          try {
+                            const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                            const { data: { session: currentSession } } = await supabase.auth.getSession();
+                            const res = await fetch(`${backendUrl}/api/scan/${scan.id}/pdf`, {
+                              headers: { 'Authorization': `Bearer ${currentSession?.access_token}` }
+                            });
+                            if (!res.ok) throw new Error('Error descargando PDF');
+                            
+                            // El backend hace un redirect a la signed URL, así que res.url será esa URL
+                            // Podemos abrir esa URL directamente (que ya no tiene el JWT del usuario, sino el token efímero de Supabase)
+                            window.open(res.url, '_blank');
+                          } catch (err) {
+                            console.error(err);
+                            setError('No se pudo abrir el PDF.');
+                          }
+                        }}
                         className="bg-white/10 hover:bg-primary-500/20 hover:text-primary-400 text-white p-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
                       >
                         Ver PDF
-                      </a>
+                      </button>
                     )}
                   </div>
                 </div>
