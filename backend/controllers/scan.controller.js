@@ -147,18 +147,24 @@ const getScanPdf = async (req, res) => {
             return res.status(404).json({ error: 'PDF not found or access denied' });
         }
 
-        // Generar URL firmada válida por 60 segundos usando Service Role Key
+        // Descargar el archivo directamente desde Supabase Storage
         const fileName = `${id}.pdf`;
-        const { data: signedData, error: signError } = await supabase.storage
+        const { data: fileData, error: downloadError } = await supabase.storage
             .from('reports')
-            .createSignedUrl(fileName, 60);
+            .download(fileName);
 
-        if (signError || !signedData) {
-            return res.status(500).json({ error: 'Failed to generate secure URL for PDF' });
+        if (downloadError || !fileData) {
+            return res.status(500).json({ error: 'Failed to download PDF from storage' });
         }
 
-        // Devolver la URL segura en JSON para que el frontend la abra
-        res.json({ url: signedData.signedUrl });
+        // Convertir el Blob de Supabase a un Buffer para enviarlo por Express
+        const arrayBuffer = await fileData.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Enviar el PDF directamente como un flujo binario
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="Reporte_Auditoria_${id}.pdf"`);
+        res.send(buffer);
 
     } catch (error) {
         console.error('Error fetching PDF:', error);

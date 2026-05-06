@@ -289,12 +289,13 @@ export default function Dashboard({ session }) {
                               });
                               if (!res.ok) throw new Error('Error solicitando PDF');
                               
-                              const data = await res.json();
-                              if (data.url) {
-                                window.open(data.url, '_blank');
-                              } else {
-                                throw new Error('URL no recibida');
-                              }
+                              // El backend ahora devuelve el binario del PDF directamente
+                              const blob = await res.blob();
+                              const blobUrl = window.URL.createObjectURL(blob);
+                              window.open(blobUrl, '_blank');
+                              
+                              // Limpiar la memoria después de un tiempo
+                              setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
                             } catch (err) {
                               console.error(err);
                               setError('No se pudo abrir el PDF.');
