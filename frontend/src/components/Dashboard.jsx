@@ -289,13 +289,31 @@ export default function Dashboard({ session }) {
                               });
                               if (!res.ok) throw new Error('Error solicitando PDF');
                               
-                              // El backend ahora devuelve el binario del PDF directamente
-                              const blob = await res.blob();
-                              const blobUrl = window.URL.createObjectURL(blob);
-                              window.open(blobUrl, '_blank');
+                              const contentType = res.headers.get('content-type');
                               
-                              // Limpiar la memoria después de un tiempo
-                              setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
+                              if (contentType && contentType.includes('application/json')) {
+                                const data = await res.json();
+                                if (data.error) throw new Error(data.error);
+                                
+                                if (data.url) {
+                                  // Fallback: Si el backend aún no se ha reiniciado y devuelve JSON con URL, 
+                                  // lo descargamos silenciosamente aquí para que el token nunca se vea.
+                                  const pdfRes = await fetch(data.url);
+                                  if (!pdfRes.ok) throw new Error('Error descargando el PDF desde storage');
+                                  const pdfBlob = await pdfRes.blob();
+                                  const blobUrl = window.URL.createObjectURL(pdfBlob);
+                                  window.open(blobUrl, '_blank');
+                                  setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
+                                }
+                              } else {
+                                // Flujo Nuevo: El backend ya devuelve el PDF directamente en binario
+                                const blob = await res.blob();
+                                // Forzamos el tipo MIME para asegurarnos que el navegador lo interprete como PDF
+                                const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+                                const blobUrl = window.URL.createObjectURL(pdfBlob);
+                                window.open(blobUrl, '_blank');
+                                setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
+                              }
                             } catch (err) {
                               console.error(err);
                               setError('No se pudo abrir el PDF.');
