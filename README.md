@@ -1,6 +1,6 @@
 # 🛡️ Aegis CyberAudit (B2B SaaS Platform)
 
-Aegis CyberAudit (antes "Antigravity") es una plataforma SaaS B2B premium diseñada para automatizar auditorías de ciberseguridad. Permite a las empresas identificar vulnerabilidades en sus aplicaciones web y generar reportes ejecutivos automatizados que mapean los hallazgos con los controles normativos de la **ISO 27001**.
+Aegis CyberAudit es una plataforma SaaS B2B premium diseñada para automatizar auditorías de ciberseguridad. Permite a las empresas identificar vulnerabilidades en sus aplicaciones web y generar reportes ejecutivos automatizados que mapean los hallazgos con los controles normativos de la **ISO 27001**.
 
 ---
 
