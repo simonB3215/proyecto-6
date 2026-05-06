@@ -132,7 +132,16 @@ export default function Dashboard({ session }) {
         })
       });
 
-      if (!res.ok) throw new Error('Falló el inicio del escaneo en el backend');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        if (errData && errData.error) {
+          if (errData.error === 'Domain not verified') {
+            throw new Error('Verificación DNS fallida: No se encontró el registro TXT en el dominio. Añádelo y espera unos minutos a que se propague.');
+          }
+          throw new Error(errData.error);
+        }
+        throw new Error('Falló el inicio del escaneo en el backend');
+      }
       
       setTargetUrl('');
       fetchScans(); // Actualiza la lista para mostrar el nuevo escaneo en progreso
