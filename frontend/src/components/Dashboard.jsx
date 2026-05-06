@@ -192,7 +192,7 @@ export default function Dashboard({ session }) {
               <form onSubmit={handleScan} className="space-y-4">
                 <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-start gap-3">
                   <Info className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-blue-200">
+                  <div className="text-sm text-blue-200 flex-1 min-w-0">
                     <p className="font-semibold mb-1">Verificación de Dominio Requerida</p>
                     <p>Por seguridad, debes añadir un registro TXT en la configuración DNS de tu dominio antes de auditarlo:</p>
                     <div className="mt-2 flex items-center gap-2 bg-dark-900/50 p-2 rounded border border-white/5">
