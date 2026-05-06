@@ -17,6 +17,23 @@ La plataforma ofrece una experiencia de usuario fluida y segura (Tenant Isolatio
 
 ---
 
+## 📝 Guía: Cómo Verificar la Propiedad de un Dominio (Anti-Abuso)
+
+Para proteger la plataforma legalmente y evitar escaneos maliciosos a infraestructuras ajenas, Aegis exige validar la propiedad del dominio mediante DNS antes de iniciar cualquier auditoría.
+
+**Pasos a seguir:**
+1. **Copia tu Token:** En el panel "Nueva Auditoría", localiza tu token oculto y haz clic en el icono de copiar (ej. `aegis-verify=788c82...`).
+2. **Configura tu DNS:** Inicia sesión en tu proveedor de dominio (Cloudflare, GoDaddy, Namecheap, etc.) y entra a la "Gestión de DNS".
+3. **Añade el Registro:** Crea un nuevo registro con estos valores:
+   - **Tipo (Type):** `TXT`
+   - **Nombre (Name/Host):** `@` (representa el dominio raíz, ej. `miempresa.com`).
+   - **Valor (Content):** Pega el token exacto (`aegis-verify=...`).
+   - **TTL:** Auto o el más bajo posible (ej. 5 minutos).
+4. **Guarda y Espera:** Guarda el registro. La propagación en internet puede ser instantánea o tardar hasta un par de horas dependiendo de tu proveedor.
+5. **Inicia la Auditoría:** Vuelve al dashboard de Aegis, ingresa tu URL y lanza el escáner. El backend leerá públicamente el registro TXT; si coincide, la auditoría comenzará automáticamente.
+
+---
+
 ## 🏗️ Arquitectura y Stack Tecnológico
 
 El proyecto está construido con un stack moderno enfocado en la velocidad, seguridad y una estética premium (Glassmorphism).
@@ -39,7 +56,9 @@ El proyecto está construido con un stack moderno enfocado en la velocidad, segu
 ---
 
 ## 🔒 Consideraciones de Seguridad Implementadas
-- **Tenant Isolation:** Filtros en Frontend y políticas estrictas RLS en PostgreSQL aseguran que un usuario (`user_id`) solo puede leer y crear escaneos que le pertenezcan.
-- **Descargas Firmadas:** Los reportes de auditoría están en un Bucket Privado. El backend verifica la identidad del usuario antes de otorgar una URL temporal para descargar el PDF.
-- **Anti-SSRF:** Bloqueo de URLs internas (`127.0.0.1`, IPs locales) en el frontend para evitar abusos de red.
-- **Limpieza de Sesión:** Los tokens de autenticación gigantes se eliminan de la URL del navegador automáticamente después de validar la sesión por motivos de estética y seguridad.
+- **Tenant Isolation (Aislamiento de Datos):** Filtros en Frontend y políticas estrictas RLS en PostgreSQL aseguran que un usuario (`user_id`) solo puede leer y crear escaneos/reportes que le pertenezcan exclusivamente a él.
+- **Verificación de Dominio (DNS TXT):** Bloqueo a nivel backend que prohíbe escanear cualquier objetivo del cual el usuario no pueda demostrar propiedad a través de un token criptográfico único inyectado en su servidor DNS.
+- **Anti-SSRF:** Bloqueo de URLs internas (`127.0.0.1`, IPs locales) en el frontend y en los workers para evitar que usuarios abusen del servidor ejecutando escaneos contra la intranet de la propia plataforma.
+- **Ofuscación de Tokens en el Frontend:** Todo token sensible (como URLs firmadas temporales o UUIDs) nunca se expone en la barra de direcciones ni es visible por defecto:
+  - Los `access_tokens` masivos de autenticación se limpian automáticamente de la URL mediante un borrado de historial.
+  - La descarga de PDFs protegidos en Supabase se realiza mediante un Proxy backend que transfiere el archivo directamente a la memoria del navegador (Blob), previniendo que los links firmados temporales queden registrados o visibles para el usuario.
