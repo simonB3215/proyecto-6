@@ -289,15 +289,20 @@ export default function Dashboard({ session }) {
                               });
                               if (!res.ok) throw new Error('Error solicitando PDF');
                               
-                              const contentType = res.headers.get('content-type');
+                              const arrayBuffer = await res.arrayBuffer();
+                              const bytes = new Uint8Array(arrayBuffer);
                               
-                              if (contentType && contentType.includes('application/json')) {
-                                const data = await res.json();
+                              // Detectamos el contenido leyendo los primeros bytes para evitar problemas de CORS con headers
+                              // Un PDF siempre empieza con "%PDF", un JSON empieza con "{"
+                              if (bytes[0] === 123) { // 123 es el código ASCII de '{'
+                                const textDecoder = new TextDecoder('utf-8');
+                                const jsonText = textDecoder.decode(bytes);
+                                const data = JSON.parse(jsonText);
+                                
                                 if (data.error) throw new Error(data.error);
                                 
                                 if (data.url) {
-                                  // Fallback: Si el backend aún no se ha reiniciado y devuelve JSON con URL, 
-                                  // lo descargamos silenciosamente aquí para que el token nunca se vea.
+                                  // Fallback silencioso: descargamos el PDF desde la URL firmada para ocultar el token
                                   const pdfRes = await fetch(data.url);
                                   if (!pdfRes.ok) throw new Error('Error descargando el PDF desde storage');
                                   const pdfBlob = await pdfRes.blob();
@@ -306,10 +311,8 @@ export default function Dashboard({ session }) {
                                   setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
                                 }
                               } else {
-                                // Flujo Nuevo: El backend ya devuelve el PDF directamente en binario
-                                const blob = await res.blob();
-                                // Forzamos el tipo MIME para asegurarnos que el navegador lo interprete como PDF
-                                const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+                                // Flujo Nuevo: El backend ya devuelve el PDF binario
+                                const pdfBlob = new Blob([arrayBuffer], { type: 'application/pdf' });
                                 const blobUrl = window.URL.createObjectURL(pdfBlob);
                                 window.open(blobUrl, '_blank');
                                 setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
