@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { LogOut, Target, Play, FileText, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, ShieldOff, Info } from 'lucide-react';
+import { LogOut, Target, Play, FileText, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, ShieldOff, Info, Eye, EyeOff, Copy } from 'lucide-react';
 import ScanLoader from './ScanLoader';
 import ComplianceScore from './ComplianceScore';
 
@@ -10,6 +10,14 @@ export default function Dashboard({ session }) {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState('');
   const [expandedScanId, setExpandedScanId] = useState(null);
+  const [showToken, setShowToken] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyToken = () => {
+    navigator.clipboard.writeText(`aegis-verify=${session.user.id}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const calculateScore = (vulnerabilities) => {
     if (!vulnerabilities) return 100;
@@ -187,9 +195,27 @@ export default function Dashboard({ session }) {
                   <div className="text-sm text-blue-200">
                     <p className="font-semibold mb-1">Verificación de Dominio Requerida</p>
                     <p>Por seguridad, debes añadir un registro TXT en la configuración DNS de tu dominio antes de auditarlo:</p>
-                    <code className="block mt-2 bg-dark-900/50 p-2 rounded text-blue-300 font-mono text-xs select-all">
-                      aegis-verify={session.user.id}
-                    </code>
+                    <div className="mt-2 flex items-center gap-2 bg-dark-900/50 p-2 rounded border border-white/5">
+                      <code className="text-blue-300 font-mono text-xs flex-1 truncate">
+                        {showToken ? `aegis-verify=${session.user.id}` : `aegis-verify=${'•'.repeat(24)}`}
+                      </code>
+                      <button 
+                        type="button"
+                        onClick={() => setShowToken(!showToken)}
+                        className="text-gray-400 hover:text-white transition-colors p-1"
+                        title={showToken ? "Ocultar token" : "Mostrar token"}
+                      >
+                        {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={handleCopyToken}
+                        className="text-gray-400 hover:text-white transition-colors p-1"
+                        title="Copiar token"
+                      >
+                        {copied ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
